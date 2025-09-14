@@ -62,12 +62,11 @@ class StrategyAnalyzer:
         """计算收益率"""
         return prices.pct_change().fillna(0)
 
-    def calculate_sharpe(self, returns, risk_free_rate=0.02):
+    def calculate_sharpe(self, returns):
         """计算夏普比率"""
         if len(returns) == 0 or returns.std() == 0:
             return 0
-        excess_returns = returns - risk_free_rate/252
-        return np.sqrt(252) * excess_returns.mean() / returns.std()
+        return np.sqrt(252) * returns.mean() / returns.std()
 
     def calculate_max_drawdown(self, cumulative_returns):
         """计算最大回撤"""
@@ -83,7 +82,7 @@ class StrategyAnalyzer:
         strategy_returns = signal * returns
         return strategy_returns.fillna(0)
 
-    def strategy_fixed_threshold(self, threshold=0.01):
+    def strategy_fixed_threshold(self, threshold=0.001):
         """固定阈值策略"""
         returns = self.calculate_returns(self.price_data)
         z_score = (self.price_data - self.price_data.rolling(20).mean()) / self.price_data.rolling(20).std()
@@ -144,15 +143,129 @@ class StrategyAnalyzer:
         strategy_returns = pd.Series(signal, index=self.price_data.index).shift(1) * returns
         return strategy_returns.fillna(0)
 
+    def optimize_strategy_parameters(self):
+        """优化所有策略的参数"""
+        optimized_params = {}
+
+        # 1. 固定阈值策略优化
+        def optimize_fixed_threshold():
+            best_sharpe = -np.inf
+            best_threshold = 0.001
+            thresholds = np.linspace(0.0005, 0.005, 20)
+
+            for threshold in thresholds:
+                returns = self.strategy_fixed_threshold(threshold)
+                sharpe = self.calculate_sharpe(returns)
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_threshold = threshold
+
+            return {'threshold': best_threshold, 'sharpe': best_sharpe}
+
+        # 2. 自适应阈值策略优化
+        def optimize_adaptive_threshold():
+            best_sharpe = -np.inf
+            best_window = 7
+            windows = range(3, 15)
+
+            for window in windows:
+                returns = self.strategy_adaptive_threshold(window)
+                sharpe = self.calculate_sharpe(returns)
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_window = window
+
+            return {'window': best_window, 'sharpe': best_sharpe}
+
+        # 3. 自适应+趋势策略优化
+        def optimize_adaptive_trend():
+            best_sharpe = -np.inf
+            best_ma_window = 50
+            ma_windows = range(20, 100, 5)
+
+            for ma_window in ma_windows:
+                returns = self.strategy_adaptive_trend(ma_window)
+                sharpe = self.calculate_sharpe(returns)
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_ma_window = ma_window
+
+            return {'ma_window': best_ma_window, 'sharpe': best_sharpe}
+
+        # 4. 动态仓位策略优化
+        def optimize_dynamic_position():
+            best_sharpe = -np.inf
+            best_threshold = 1.5
+            thresholds = np.linspace(0.5, 3.0, 20)
+
+            for threshold in thresholds:
+                returns = self.strategy_dynamic_position(threshold)
+                sharpe = self.calculate_sharpe(returns)
+                if sharpe > best_sharpe:
+                    best_sharpe = sharpe
+                    best_threshold = threshold
+
+            return {'threshold': best_threshold, 'sharpe': best_sharpe}
+
+        # 5. 多因子策略优化
+        def optimize_multi_factor():
+            best_sharpe = -np.inf
+            best_weights = [0.3, 0.3, 0.4]
+
+            # 优化权重组合
+            for w1 in np.linspace(0.1, 0.5, 9):
+                for w2 in np.linspace(0.1, 0.5, 9):
+                    w3 = 1 - w1 - w2
+                    if w3 > 0:
+                        returns = self.strategy_multi_factor_custom_weights(w1, w2, w3)
+                        sharpe = self.calculate_sharpe(returns)
+                        if sharpe > best_sharpe:
+                            best_sharpe = sharpe
+                            best_weights = [w1, w2, w3]
+
+            return {'weights': best_weights, 'sharpe': best_sharpe}
+
+        # 执行优化
+        optimized_params['固定阈值'] = optimize_fixed_threshold()
+        optimized_params['自适应阈值'] = optimize_adaptive_threshold()
+        optimized_params['自适应+趋势'] = optimize_adaptive_trend()
+        optimized_params['动态仓位'] = optimize_dynamic_position()
+        optimized_params['多因子'] = optimize_multi_factor()
+
+        return optimized_params
+
+    def strategy_multi_factor_custom_weights(self, w1, w2, w3):
+        """自定义权重的多因子策略"""
+        returns = self.calculate_returns(self.price_data)
+
+        # 因子1: 动量因子
+        momentum = self.price_data.pct_change(5)
+
+        # 因子2: 波动率因子
+        volatility = returns.rolling(10).std()
+
+        # 因子3: 均值回归
+        mean_reversion = (self.price_data - self.price_data.rolling(20).mean()) / self.price_data.rolling(20).std()
+
+        # 组合信号
+        combined_signal = w1 * momentum + w2 * (1/volatility) + w3 * mean_reversion
+        signal = np.tanh(combined_signal)
+
+        strategy_returns = pd.Series(signal, index=self.price_data.index).shift(1) * returns
+        return strategy_returns.fillna(0)
+
     def generate_all_strategies_data(self):
-        """生成所有策略数据"""
+        """生成所有策略数据（使用优化后的参数）"""
+        # 获取优化参数
+        optimized_params = self.optimize_strategy_parameters()
+
         strategies = {
             '基础策略': self.strategy_basic(),
-            '固定阈值': self.strategy_fixed_threshold(),
-            '自适应阈值': self.strategy_adaptive_threshold(),
-            '自适应+趋势': self.strategy_adaptive_trend(),
-            '动态仓位': self.strategy_dynamic_position(),
-            '多因子': self.strategy_multi_factor()
+            '固定阈值': self.strategy_fixed_threshold(optimized_params['固定阈值']['threshold']),
+            '自适应阈值': self.strategy_adaptive_threshold(optimized_params['自适应阈值']['window']),
+            '自适应+趋势': self.strategy_adaptive_trend(optimized_params['自适应+趋势']['ma_window']),
+            '动态仓位': self.strategy_dynamic_position(optimized_params['动态仓位']['threshold']),
+            '多因子': self.strategy_multi_factor_custom_weights(*optimized_params['多因子']['weights'])
         }
 
         results = {}
@@ -162,6 +275,13 @@ class StrategyAnalyzer:
             max_dd = self.calculate_max_drawdown(cumulative)
             annual_return = cumulative.iloc[-1] ** (252/len(cumulative)) - 1 if len(cumulative) > 0 else 0
 
+            # 添加参数信息
+            params = {}
+            if name in optimized_params:
+                params = optimized_params[name].copy()
+                if 'sharpe' in params:
+                    del params['sharpe']  # 删除sharpe值，只保留参数
+
             results[name] = {
                 'returns': returns.tolist(),
                 'cumulative': cumulative.tolist(),
@@ -169,7 +289,8 @@ class StrategyAnalyzer:
                 'sharpe_ratio': sharpe,
                 'max_drawdown': max_dd,
                 'annual_return': annual_return,
-                'volatility': returns.std() * np.sqrt(252)
+                'volatility': returns.std() * np.sqrt(252),
+                'parameters': params
             }
 
         return results
@@ -187,6 +308,15 @@ def get_strategies():
     try:
         data = analyzer.generate_all_strategies_data()
         return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/optimized-parameters')
+def get_optimized_parameters():
+    """获取优化后的参数信息"""
+    try:
+        optimized_params = analyzer.optimize_strategy_parameters()
+        return jsonify(optimized_params)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

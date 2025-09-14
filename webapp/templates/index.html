@@ -53,6 +53,73 @@
             border-bottom: 1px solid #e9ecef;
         }
 
+        .parameters-section {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .parameters-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .parameters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .parameter-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .parameter-name {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .parameter-value {
+            color: #3498db;
+            font-family: monospace;
+            font-size: 0.95em;
+        }
+
+        .optimize-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .optimize-btn:hover {
+            background: #219a52;
+            transform: translateY(-2px);
+        }
+
+        .optimizing {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
         .control-group {
             display: flex;
             gap: 15px;
@@ -263,9 +330,23 @@
                 </select>
                 <button onclick="refreshData()">🔄 刷新数据</button>
                 <button onclick="exportData()">📊 导出数据</button>
+                <button class="optimize-btn" onclick="optimizeParameters()" id="optimizeBtn">
+                    ⚡ 优化参数
+                </button>
             </div>
             <div class="strategy-toggles" id="strategyToggles">
                 <!-- 动态生成策略选择器 -->
+            </div>
+
+            <!-- 参数显示区域 -->
+            <div class="parameters-section">
+                <div class="parameters-title">
+                    🔧 当前策略参数
+                    <small style="color: #6c757d; font-weight: normal;">(点击"优化参数"按钮进行自动优化)</small>
+                </div>
+                <div class="parameters-grid" id="parametersGrid">
+                    <!-- 动态生成参数卡片 -->
+                </div>
             </div>
         </div>
 
@@ -360,9 +441,92 @@
                 hideLoading();
                 updateCharts();
                 updateMetrics();
+                updateParametersDisplay();
             } catch (error) {
                 showError('数据加载失败: ' + error.message);
             }
+        }
+
+        // 更新参数显示
+        function updateParametersDisplay() {
+            const container = document.getElementById('parametersGrid');
+            container.innerHTML = '';
+
+            Object.keys(allData).forEach(strategy => {
+                if (allData[strategy].parameters && Object.keys(allData[strategy].parameters).length > 0) {
+                    const paramCard = document.createElement('div');
+                    paramCard.className = 'parameter-card';
+
+                    let paramHtml = `<div class="parameter-name">${strategy}</div>`;
+                    Object.keys(allData[strategy].parameters).forEach(param => {
+                        const value = allData[strategy].parameters[param];
+                        if (Array.isArray(value)) {
+                            paramHtml += `<div class="parameter-value">${param}: [${value.map(v => v.toFixed(3)).join(', ')}]</div>`;
+                        } else {
+                            paramHtml += `<div class="parameter-value">${param}: ${typeof value === 'number' ? value.toFixed(4) : value}</div>`;
+                        }
+                    });
+
+                    paramCard.innerHTML = paramHtml;
+                    container.appendChild(paramCard);
+                }
+            });
+
+            // 如果没有参数，显示默认信息
+            if (container.children.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #6c757d; grid-column: 1/-1;">暂无参数信息，点击"优化参数"按钮进行优化</div>';
+            }
+        }
+
+        // 优化参数
+        async function optimizeParameters() {
+            const btn = document.getElementById('optimizeBtn');
+            const originalText = btn.innerHTML;
+
+            try {
+                btn.innerHTML = '⚡ 优化中...';
+                btn.classList.add('optimizing');
+
+                const response = await fetch('/api/optimized-parameters');
+                if (!response.ok) throw new Error('参数优化失败');
+
+                const optimizedParams = await response.json();
+
+                // 重新加载数据以获取优化后的结果
+                await loadAllData();
+
+                // 显示优化结果
+                showOptimizationResults(optimizedParams);
+
+            } catch (error) {
+                showError('参数优化失败: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.classList.remove('optimizing');
+            }
+        }
+
+        // 显示优化结果
+        function showOptimizationResults(optimizedParams) {
+            let message = '🎉 参数优化完成！\n\n';
+            Object.keys(optimizedParams).forEach(strategy => {
+                const params = optimizedParams[strategy];
+                const sharpe = params.sharpe;
+                delete params.sharpe;
+
+                message += `${strategy} (夏普比率: ${sharpe.toFixed(4)}):\n`;
+                Object.keys(params).forEach(param => {
+                    const value = params[param];
+                    if (Array.isArray(value)) {
+                        message += `  ${param}: [${value.map(v => v.toFixed(3)).join(', ')}]\n`;
+                    } else {
+                        message += `  ${param}: ${typeof value === 'number' ? value.toFixed(4) : value}\n`;
+                    }
+                });
+                message += '\n';
+            });
+
+            alert(message);
         }
 
         // 显示加载状态
