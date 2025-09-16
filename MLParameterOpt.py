@@ -11,7 +11,7 @@ import json
 import time
 import os
 import warnings
-from strategy_functions import StrategyFunctions
+from Strategy import StrategyFunctions
 from performance_metrics import PerformanceMetrics
 warnings.filterwarnings('ignore')
 
