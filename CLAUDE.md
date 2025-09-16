@@ -4,181 +4,159 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a comprehensive quantitative trading research repository focused on developing and testing algorithmic trading strategies. The project has evolved into two main components:
-
-1. **中信建投/任务一/** - IC futures trading strategy backtesting system (Jupyter notebook based)
-2. **webapp/** - Flask-based web application for real-time strategy visualization and analysis
-3. **uni/Orcale/** - Oracle database management tools
-
-## Key Dependencies
-
-The project relies on standard data science and trading libraries:
-- numpy, pandas, matplotlib, seaborn
-- yfinance for market data
-- sklearn for machine learning strategies
-- oracledb for Oracle database operations
-- flask, flask-cors for web application
-
-**No formal dependency management** - install packages manually as needed:
-```bash
-pip install numpy pandas matplotlib seaborn yfinance scikit-learn oracledb flask flask-cors
-```
+This is a **quantitative trading research repository** focused on developing and testing algorithmic trading strategies for Chinese futures markets (IF, IH, IC, IM contracts). The project implements a complete parameter optimization system using both traditional grid search and machine learning approaches with random sampling.
 
 ## Architecture Overview
 
-### Trading Strategy System (Dual Implementation)
+### Core Components
 
-#### Jupyter Notebook Implementation (中信建投/任务一/)
-- **MinutesIdx.h5** - HDF5 file containing minute-level IC futures data (202MB)
-- **new_cala.ipynb** - Complete strategy development workflow with 10 strategies
-- **Core Strategy Class**: `stock_info` with comprehensive strategy methods
+The system consists of **4 main Python modules**:
 
-#### Web Application Implementation (webapp/)
-- **app.py** - Flask application with `StrategyAnalyzer` class
-- **Real-time strategy comparison and visualization**
-- **Interactive web interface for strategy analysis**
-- **HTML5 report generation**
+1. **`MLParameterOpt.py`** (17KB) - ML-based parameter optimizer using random sampling
+2. **`ProductAnal.py`** (20KB) - Product visualization and analysis
+3. **`Strategy.py`** (9KB) - Core trading strategy implementations
+4. **`Valuemetrics.py`** (15KB) - Financial metrics and value calculations
 
-### Strategy Implementation Details
+### Data Pipeline
 
-The project implements **10 different trading strategies**:
+```
+HDF5 Data → Random Sampling → Strategy Calculation → Performance Metrics → Parameter Optimization
+```
 
-1. **Fixed Threshold** - Simple mean reversion with fixed z-score threshold
-2. **Improved Threshold** - Dual threshold bandwidth with state machine
-3. **Adaptive Threshold** - Dynamic threshold based on rolling volatility
-4. **Adaptive + Trend** - Trend-filtered adaptive strategy
-5. **Dynamic Position** - Smooth position sizing using tanh function
-6. **Volatility Weighted** - Inverse volatility scaling for position sizing
-7. **Vol Weighted + Dynamic Threshold** - Combined volatility and threshold adaptation
-8. **Multi Timeframe** - 5/20/60 minute multi-period signal combination
-9. **ML Enhanced** - Random forest classifier with feature engineering
-10. **Risk Parity** - Target volatility control with dynamic leverage
+**Data Source**: `中信建投/任务一/MinutesIdx.h5` (202MB, excluded from git) containing minute-level futures data
 
-### Data Structure
+## Key Dependencies
 
-**HDF5 File Structure**:
-- Complex nested data structures requiring special handling
-- `StrategyAnalyzer` class automatically extracts and processes data
-- Supports various formats: DataFrame, Series, nested structures
-- Converts to consistent price series for analysis
+**Missing Dependencies**: The project references modules that don't exist:
+- `strategy_functions.py` (imported in MLParameterOpt.py)
+- `performance_metrics.py` (imported in MLParameterOpt.py and ProductAnal.py)
 
-## Development Workflow
+**Actual Dependencies Used**:
+```python
+# Core data science
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy import stats
 
-### Running Trading Strategies
+# Standard library
+import json, time, os, warnings
+```
 
-#### Option 1: Jupyter Notebook (Traditional)
+**No Formal Dependency Management**: No requirements.txt, setup.py, or pyproject.toml files exist.
+
+## Development Commands
+
+### Primary Entry Points
 ```bash
-# Launch Jupyter for strategy development
+# Main operations
+python MLParameterOpt.py    # ML parameter optimization with random sampling
+python ProductAnal.py       # Product analysis and visualization
+python Strategy.py          # Strategy implementations
+python Valuemetrics.py      # Financial metrics calculations
+
+# Interactive development
 jupyter notebook 中信建投/任务一/new_cala.ipynb
 ```
 
-#### Option 2: Web Application (Recommended)
-```bash
-# Quick launch from project root
-python launch_webapp.py
+### No Build System
+The project lacks traditional build/test commands. Files are executed directly without formal build processes.
 
-# Or manual launch
-cd webapp && python app.py
-# Access at http://localhost:5000
-```
+## Strategy Implementation
 
-### Web Application Features
-- **6 trading strategies** with real-time comparison
-- **Interactive strategy selection**
-- **Multi-dimensional performance analysis charts**
-- **Data export functionality**
-- **Responsive design for mobile and desktop**
+### Core Strategies
+1. **Simple Reversal Strategy** - Basic mean reversion (baseline)
+2. **Fixed Threshold Strategy** - Static z-score based trading
+3. **Adaptive Threshold Strategy** - Dynamic threshold adjustment using rolling statistics
+4. **ML Enhanced Strategy** - Random sampling based parameter optimization
 
-### Common Development Commands
-```bash
-# Launch Jupyter for strategy development
-jupyter notebook
+### Key Classes
+- `SampleBasedMLOptimizer` - ML parameter optimization with configurable sampling
+- `StrategyFunctions` - Collection of trading strategy implementations
+- Performance calculation utilities for Sharpe ratios and returns
 
-# Run individual Python scripts
-python uni/Orcale/编辑表.py
+## Technical Architecture
 
-# Debug specific strategies
-python webapp/scripts/debug_strategies.py
-
-# Test API endpoints
-python webapp/scripts/test_api.py
-
-# Quick webapp launch
-python launch_webapp.py
-```
-
-## Key Files and Data
-
-### Primary Data Files
-- **中信建投/任务一/MinutesIdx.h5** - Main dataset (202MB), minute-level futures data
-- **中信建投/任务一/new_cala.ipynb** - Complete strategy implementations
-- **.gitignore** - Excludes the large HDF5 data file
-
-### Web Application Files
-- **webapp/app.py** - Main Flask application with StrategyAnalyzer class
-- **webapp/templates/** - HTML templates for web interface
-- **webapp/static/** - CSS, JavaScript, and static assets
-- **webapp/scripts/** - Debug and testing utilities
-- **launch_webapp.py** - Quick launcher from project root
-
-### Strategy Class Architecture
-
-Both implementations share similar core functionality:
-
+### Random Sampling Method
+The ML optimizer uses random sampling to reduce computational complexity:
 ```python
-class StrategyAnalyzer / stock_info:
-    def __init__(self, filepath, target_col)
-    def load_data()  # Handles complex HDF5 structures
-    def calculate_sharpe(self, pnl)
-    # 10 strategy methods including:
-    # - strategy_fixed_threshold()
-    # - strategy_ml_enhanced()
-    # - strategy_risk_parity()
-    # - generate_html_report()  # Web app only
+n_samples = 30      # 30 random samples
+sample_days = 15   # 15 days per sample
+total_data = 450 days (vs 3500+ days original)
 ```
 
-## Advanced Features
+**Benefits**: 87% reduction in computation while maintaining statistical representativeness.
 
-### HTML5 Report Generation
-- Professional interactive reports with strategy comparisons
-- Performance metrics and visualizations
-- Responsive design with mobile support
-- Real-time data updates
+### Parameter Search Space
+```python
+# Fixed threshold strategy
+thresholds = [0.001, 0.002, 0.005, 0.01]
 
-### Machine Learning Integration
-- Random forest classification for price direction prediction
-- Feature engineering with technical indicators
-- Probability-weighted position sizing
+# Adaptive threshold strategy
+windows = [3, 5, 7, 10, 15]
+std_multipliers = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+# Total: 30 parameter combinations
+```
 
-### Risk Management
-- Volatility-based position sizing
-- Maximum leverage constraints
-- Dynamic threshold adaptation
-- Risk parity allocation
+## Project Structure
 
-## Testing and Debugging
+```
+F:\HelloWorld\Code\
+├── Core Python Scripts:
+│   ├── Strategy.py (9KB) - Strategy function implementations
+│   ├── MLParameterOpt.py (17KB) - ML-based parameter optimizer
+│   ├── ProductAnal.py (20KB) - Product visualization analyzer
+│   └── Valuemetrics.py (15KB) - Value metrics calculations
+├── 中信建投/任务一/:
+│   ├── MinutesIdx.h5 (202MB) - Main dataset (gitignored)
+│   ├── new_cala.ipynb (683KB) - Jupyter notebook
+│   └── Generated PNG files - Analysis charts
+├── Configuration:
+│   ├── .gitignore - Excludes HDF5 data file
+│   ├── .vscode/settings.json - VS Code Python configuration
+│   └── .claude/settings.local.json - Claude Code permissions
+└── Documentation:
+    ├── README.md - Project documentation (Chinese)
+    └── CLAUDE.md - This file
+```
 
-### Strategy Testing
-- Jupyter notebook execution and validation
-- Web application real-time testing
-- Manual verification of Sharpe ratios and returns
-- Visual inspection of cumulative return plots
+## Current Issues
 
-### Debug Tools
-- **webapp/scripts/debug_strategies.py** - Individual strategy analysis
-- **webapp/scripts/test_api.py** - API endpoint testing
-- Comprehensive error handling for data structure issues
+### Missing Components
+1. **Missing Module Dependencies**: Code imports non-existent modules (`strategy_functions`, `performance_metrics`)
+2. **No Web Application**: Despite documentation mentioning webapp components, they don't exist
+3. **No Dependency Management**: No formal package management system
+4. **No Tests**: No testing framework or test files
+5. **No CI/CD**: No continuous integration configuration
 
-## Performance Optimization
+### Documentation Inconsistencies
+The existing CLAUDE.md file describes features (webapp, 10 strategies) that don't exist in the current codebase, suggesting documentation drift from actual implementation.
 
-### Data Handling
-- Efficient HDF5 data extraction
-- Rolling window calculations with pandas
-- Memory optimization for large datasets
-- Parallel processing for multiple strategies
+## Working with This Codebase
 
-### Web Application
-- CORS enabled for cross-origin requests
-- Non-interactive matplotlib backend for server use
-- Responsive design principles
-- Real-time data updates without page refresh
+### Before Starting
+1. **Check Missing Dependencies**: Verify that `strategy_functions.py` and `performance_metrics.py` exist or create them
+2. **Data File**: Ensure `中信建投/任务一/MinutesIdx.h5` is available (202MB, not in git)
+3. **Environment Setup**: Install required packages manually (no requirements.txt)
+
+### Common Development Patterns
+- **Strategy Development**: Add new strategies to `Strategy.py` following the existing pattern
+- **Parameter Optimization**: Extend the sampling methods in `MLParameterOpt.py`
+- **Analysis**: Use `ProductAnal.py` for visualization and `Valuemetrics.py` for metrics
+- **Interactive Work**: Use the Jupyter notebook for experimentation
+
+### File Naming Conventions
+- Main modules use CamelCase.py (`MLParameterOpt.py`, `ProductAnal.py`)
+- Classes use CamelCase (`SampleBasedMLOptimizer`, `StrategyFunctions`)
+- Methods use snake_case (`simple_reversal_strategy`, `calculate_sharpe`)
+
+## Output Files
+
+### Parameter Configuration Files
+- `latest_optimal_params.json` - Traditional optimization results
+- `latest_sampling_ml_params.json` - ML optimization results
+
+### Analysis Outputs
+- PNG charts in `中信建投/任务一/` directory
+- JSON parameter files with optimal configurations
+- Console output with performance metrics and recommendations
