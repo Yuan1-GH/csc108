@@ -6,7 +6,10 @@
       "Bash(tree:*)",
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(find:*)",
+      "Bash(timeout:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []
