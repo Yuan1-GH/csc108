@@ -110,10 +110,11 @@ class FuturesVisualizer:
         # 过滤时间范围
         filtered_data = self.filter_data_by_time_range(data, options.get('time_range', 'all'))
         
-        # 为了提高性能，对于大数据集进行采样
-        if len(filtered_data) > 10000:
-            # 按日期分组，每天取一个代表性数据点
-            daily_data = filtered_data.groupby(filtered_data['DateIndex'].dt.date).agg({
+        # 为了提高性能，对于大数据集进行智能采样
+        if len(filtered_data) > 50000:
+            # 对于超大数据集，按小时采样
+            filtered_data['Hour'] = filtered_data['DateTime'].dt.floor('H')
+            hourly_data = filtered_data.groupby(['Hour']).agg({
                 'Open': 'first',
                 'High': 'max',
                 'Low': 'min',
@@ -121,10 +122,16 @@ class FuturesVisualizer:
                 'Volume': 'sum',
                 'DateTime': 'first'
             }).reset_index()
-            daily_data['DateIndex'] = pd.to_datetime(daily_data['DateIndex'])
-            plot_data = daily_data
-            freq_text = "日线"
+            hourly_data['DateIndex'] = hourly_data['Hour']
+            plot_data = hourly_data.sort_values('DateIndex')
+            freq_text = "小时线"
+        elif len(filtered_data) > 20000:
+            # 对于大数据集，每隔几分钟采样一次
+            sample_interval = max(1, len(filtered_data) // 15000)
+            plot_data = filtered_data.iloc[::sample_interval].copy()
+            freq_text = f"分钟线(每{sample_interval}分钟采样)"
         else:
+            # 小数据集直接使用原始数据
             plot_data = filtered_data
             freq_text = "分钟线"
         
@@ -141,10 +148,10 @@ class FuturesVisualizer:
         else:
             fig = make_subplots(rows=1, cols=1)
         
-        # 添加K线图
+        # 添加K线图 - 使用DateTime而不是DateIndex确保时间精度
         fig.add_trace(
             go.Candlestick(
-                x=plot_data['DateIndex'],
+                x=plot_data['DateTime'],
                 open=plot_data['Open'],
                 high=plot_data['High'],
                 low=plot_data['Low'],
@@ -166,7 +173,7 @@ class FuturesVisualizer:
             
             fig.add_trace(
                 go.Scatter(
-                    x=plot_data['DateIndex'],
+                    x=plot_data['DateTime'],
                     y=ma5,
                     mode='lines',
                     name='MA5',
@@ -177,7 +184,7 @@ class FuturesVisualizer:
             
             fig.add_trace(
                 go.Scatter(
-                    x=plot_data['DateIndex'],
+                    x=plot_data['DateTime'],
                     y=ma20,
                     mode='lines',
                     name='MA20',
@@ -192,7 +199,7 @@ class FuturesVisualizer:
             
             fig.add_trace(
                 go.Scatter(
-                    x=plot_data['DateIndex'],
+                    x=plot_data['DateTime'],
                     y=upper,
                     mode='lines',
                     name='布林上轨',
@@ -204,7 +211,7 @@ class FuturesVisualizer:
             
             fig.add_trace(
                 go.Scatter(
-                    x=plot_data['DateIndex'],
+                    x=plot_data['DateTime'],
                     y=lower,
                     mode='lines',
                     name='布林下轨',
@@ -223,7 +230,7 @@ class FuturesVisualizer:
             
             fig.add_trace(
                 go.Bar(
-                    x=plot_data['DateIndex'],
+                    x=plot_data['DateTime'],
                     y=plot_data['Volume'],
                     name='成交量',
                     marker_color=colors,
@@ -282,10 +289,11 @@ class FuturesVisualizer:
         # 过滤时间范围
         filtered_data = self.filter_data_by_time_range(data, options.get('time_range', 'all'))
         
-        # 为了提高性能，对大数据集进行采样
-        if len(filtered_data) > 5000:
-            step = len(filtered_data) // 5000
-            plot_data = filtered_data.iloc[::step]
+        # 为了提高性能，对大数据集进行智能采样，保持时间精度
+        if len(filtered_data) > 10000:
+            # 计算合适的采样间隔，确保保留时间分布
+            sample_interval = max(1, len(filtered_data) // 8000)
+            plot_data = filtered_data.iloc[::sample_interval].copy()
         else:
             plot_data = filtered_data
         
@@ -366,10 +374,11 @@ class FuturesVisualizer:
         # 过滤时间范围
         filtered_data = self.filter_data_by_time_range(data, options.get('time_range', 'all'))
         
-        # 为了提高性能，对大数据集进行采样
-        if len(filtered_data) > 5000:
-            step = len(filtered_data) // 5000
-            plot_data = filtered_data.iloc[::step]
+        # 为了提高性能，对大数据集进行智能采样，保持时间精度
+        if len(filtered_data) > 10000:
+            # 计算合适的采样间隔，确保保留时间分布
+            sample_interval = max(1, len(filtered_data) // 8000)
+            plot_data = filtered_data.iloc[::sample_interval].copy()
         else:
             plot_data = filtered_data
         
@@ -440,41 +449,19 @@ class FuturesVisualizer:
         """
         fig.show()
     
-    def save_chart(self, fig, product: str, chart_type: str, time_range: str, technical_indicators: list = None):
+    def save_chart(self, fig, filename: str):
         """
-        保存图表到指定目录，使用新的命名格式
+        保存图表
         
         Args:
             fig: Plotly图表对象
-            product (str): 期货产品名称
-            chart_type (str): 图表类型
-            time_range (str): 时间范围
-            technical_indicators (list): 技术指标列表
+            filename (str): 文件名
         """
-        import os
-        
         try:
-            # 创建保存目录
-            save_dir = os.path.join("..", "中信建投", "任务一")
-            os.makedirs(save_dir, exist_ok=True)
-            
-            # 生成技术指标字符串
-            if technical_indicators:
-                tech_str = "-".join(technical_indicators)
-            else:
-                tech_str = chart_type
-            
-            # 生成文件名：{产品}-{技术指标}-{时间范围}.html
-            filename = f"{product}-{tech_str}-{time_range}.html"
-            filepath = os.path.join(save_dir, filename)
-            
-            # 保存文件
-            fig.write_html(filepath)
-            print(f"✅ 图表已保存为: {filepath}")
-            return filepath
+            fig.write_html(filename)
+            print(f"✅ 图表已保存为: {filename}")
         except Exception as e:
             print(f"❌ 保存图表失败: {e}")
-            return None
 
 def test_visualization():
     """测试可视化功能"""

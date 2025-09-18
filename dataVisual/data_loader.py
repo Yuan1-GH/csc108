@@ -13,7 +13,7 @@ import os
 class FuturesDataLoader:
     """期货数据加载器"""
     
-    def __init__(self, csv_path="../csv/MinutesIdxCLnd.csv"):
+    def __init__(self, csv_path="dataVisual/csv/MinutesIdxClnd.csv"):
         """
         初始化数据加载器
         

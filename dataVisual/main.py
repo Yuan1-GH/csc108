@@ -112,21 +112,9 @@ class FuturesAnalysisApp:
             try:
                 save_choice = input("\n是否保存图表到HTML文件? (y/n): ").strip().lower()
                 if save_choice in ['y', 'yes', '是']:
-                    # 获取技术指标列表
-                    technical_indicators = []
-                    if options.get('show_ma', False):
-                        technical_indicators.append('MA')
-                    if options.get('show_bollinger', False):
-                        technical_indicators.append('Bollinger')
-                    
-                    # 保存图表，使用新的命名格式
-                    filepath = self.visualizer.save_chart(
-                        fig, 
-                        product, 
-                        options['chart_type'], 
-                        options['time_range'], 
-                        technical_indicators if technical_indicators else None
-                    )
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"futures_chart_{product}_{timestamp}.html"
+                    self.visualizer.save_chart(fig, filename)
             except EOFError:
                 # 处理输入流结束的情况
                 print("\n⚠️ 输入流结束，跳过保存图表")
@@ -211,7 +199,7 @@ def check_dependencies():
 
 def check_data_file():
     """检查数据文件是否存在"""
-    data_file = "../csv/MinutesIdxCLnd.csv"
+    data_file = "dataVisual/csv/MinutesIdxClnd.csv"
     
     if not os.path.exists(data_file):
         print(f"❌ 数据文件不存在: {data_file}")

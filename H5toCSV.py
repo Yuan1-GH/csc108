@@ -238,8 +238,8 @@ def main():
     print("="*60)
     
     # 配置参数
-    h5_file_path = "中信建投/任务一/MinutesIdx.h5"
-    output_dir = "csv"
+    h5_file_path = "src/MinutesIdx.h5"
+    output_dir = "dataVisual/csv"
     
     # 是否使用小型测试数据集（仅处理少量数据，用于测试）
     use_test_data = False  # 设置为True使用小型测试数据集，False使用完整数据集
