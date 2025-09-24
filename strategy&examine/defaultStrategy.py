@@ -1,10 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import yfinance as yf
-import seaborn as sns
 import matplotlib.font_manager as fm
-from matplotlib import rcParams
+# 删除未使用的rcParams导入
 # 包的准备
 
 # 设置中文字体支持
@@ -165,8 +163,8 @@ class stock_info:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
         
         # 定义收益率区间
-        bins = [-float('inf'), -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15, float('inf')]
-        bin_labels = ['<-0.15', '-0.15~-0.1', '-0.1~-0.05', '-0.05~0', '0~0.05', '0.05~0.1', '0.1~0.15', '>0.15']
+        bins = [-float('inf'), -0.03, -0.025, -0.02, -0.015, -0.01, -0.005, 0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03, float('inf')]
+        bin_labels = ['<-0.03', '-0.03~-0.025', '-0.025~-0.02', '-0.02~-0.015', '-0.015~-0.01', '-0.01~-0.005', '-0.005~0', '0~0.005', '0.005~0.01', '0.01~0.015', '0.015~0.02', '0.02~0.025', '0.025~0.03', '>0.03']
         
         # 统计各区间的天数
         return_counts = pd.cut(returns, bins=bins, labels=bin_labels).value_counts().sort_index()

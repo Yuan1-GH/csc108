@@ -53,14 +53,12 @@ class stock_info:
         参数:
         window_size: 滚动窗口大小
         """
-        # 计算每日收盘价相对于VWAP的偏离度
+
         deviation = (self.readouts["T_last_close"] - self.readouts["T_vap"]) / self.readouts["T_vap"]
         
         # 计算滚动窗口内偏离度的标准差作为自适应阈值
-        adaptive_threshold = deviation.rolling(window=window_size, min_periods=1).std()
+        adaptive_threshold = deviation.rolling(window=window_size, min_periods=window_size).std()
         
-        # 应用自适应阈值策略
-        # 如果偏离度 > 阈值，卖出(-1)；如果偏离度 < -阈值，买入(+1)；否则持有(0)
         self.readouts["adaptive_thres"] = np.where(
             deviation > adaptive_threshold, -1,
             np.where(deviation < -adaptive_threshold, 1, 0)
@@ -114,61 +112,90 @@ class stock_info:
         
         return total_return
     
-    def optimize_window_size(self, window_range=(3, 30), t_exec=59):
+    def optimize_window_size(self, window_range=(3, 50), t_exec=59):
         """
-        优化滚动窗口大小，寻找收益率之和最高的参数
+        优化滚动窗口大小，寻找斐波那契数列时间夏普比率平均值最高的参数
         
         参数:
         window_range: 窗口大小搜索范围 (最小值, 最大值)
-        t_exec: 执行时间点
+        t_exec: 执行时间点（此参数现在主要用于兼容性，实际使用斐波那契数列）
         
         返回:
         best_window: 最优窗口大小
-        best_return: 最优收益率
+        best_avg_sharpe: 最优平均夏普比率
         results: 所有测试结果
         """
         window_sizes = range(window_range[0], window_range[1] + 1)
         results = []
+        fibonacci_times = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 239]
         
         print(f"开始优化滚动窗口参数，搜索范围: {window_range}")
+        print(f"使用斐波那契数列时间点计算平均夏普比率: {fibonacci_times}")
         
         for i, window_size in enumerate(window_sizes):
-            total_return = self.evaluate_window_performance(window_size, t_exec)
-            results.append((window_size, total_return))
+            # 计算该窗口大小在斐波那契时间点的夏普比率平均值
+            sharpe_ratios = []
+            
+            for t in fibonacci_times:
+                try:
+                    # 计算策略信号
+                    strategy_signals = self.calculate_strategy_with_window(window_size)
+                    
+                    # 计算收益率
+                    strategy_ = strategy_signals[:-2]
+                    short_price_T_p1 = np.array([self.target_raw.loc[day]["Close"].iloc[t] for day in self.dates[1:-1]])
+                    long_price_T_p2 = np.array([self.target_raw.loc[day]["Close"].iloc[t] for day in self.dates[2:]])
+                    
+                    return_rates = ((long_price_T_p2/short_price_T_p1)-1.) * strategy_
+                    
+                    # 计算夏普比率
+                    if len(return_rates) > 0 and np.std(return_rates) != 0:
+                        sharpe_ratio = np.sqrt(250.) * np.mean(return_rates) / np.std(return_rates)
+                        sharpe_ratios.append(sharpe_ratio)
+                    else:
+                        sharpe_ratios.append(0)
+                        
+                except (IndexError, KeyError):
+                    # 如果时间t超出数据范围，使用0作为默认值
+                    sharpe_ratios.append(0)
+            
+            # 计算斐波那契时间点的夏普比率平均值
+            avg_sharpe_ratio = np.mean(sharpe_ratios)
+            results.append((window_size, avg_sharpe_ratio))
             
             if (i + 1) % 5 == 0:
                 print(f"已完成 {i + 1}/{len(window_sizes)} 个参数测试")
         
-        # 找到最优参数
-        best_window, best_return = max(results, key=lambda x: x[1])
+        # 找到最优参数（平均夏普比率最高）
+        best_window, best_avg_sharpe = max(results, key=lambda x: x[1])
         
         print(f"\n优化完成！")
         print(f"最优窗口大小: {best_window}")
-        print(f"最优总收益率: {best_return:.6f}")
+        print(f"最优平均夏普比率: {best_avg_sharpe:.6f}")
         
-        return best_window, best_return, results
+        return best_window, best_avg_sharpe, results
     
     def plot_window_optimization(self, results):
         """
         绘制窗口大小优化结果图表
         
         参数:
-        results: 优化结果列表 [(window_size, return), ...]
+        results: 优化结果列表 [(window_size, avg_sharpe_ratio), ...]
         """
         window_sizes = [r[0] for r in results]
-        returns = [r[1] for r in results]
+        sharpe_ratios = [r[1] for r in results]
         
         plt.figure(figsize=(12, 6))
-        plt.plot(window_sizes, returns, 'b-', linewidth=2, label='总收益率')
+        plt.plot(window_sizes, sharpe_ratios, 'b-', linewidth=2, label='平均夏普比率')
         
         # 标记最优点
-        best_idx = np.argmax(returns)
-        plt.scatter(window_sizes[best_idx], returns[best_idx], 
+        best_idx = np.argmax(sharpe_ratios)
+        plt.scatter(window_sizes[best_idx], sharpe_ratios[best_idx], 
                    color='red', s=100, zorder=5, label=f'最优点 (窗口={window_sizes[best_idx]})')
         
         plt.xlabel('滚动窗口大小')
-        plt.ylabel('总收益率')
-        plt.title('自适应阈值策略窗口大小优化结果')
+        plt.ylabel('平均夏普比率')
+        plt.title('自适应阈值策略窗口大小优化结果（斐波那契时间夏普比率平均值）')
         plt.grid(True, alpha=0.3)
         plt.legend()
         plt.tight_layout()
@@ -392,8 +419,8 @@ class stock_info:
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
         
         # 定义收益率区间
-        bins = [-float('inf'), -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15, float('inf')]
-        bin_labels = ['<-0.15', '-0.15~-0.1', '-0.1~-0.05', '-0.05~0', '0~0.05', '0.05~0.1', '0.1~0.15', '>0.15']
+        bins = [-float('inf'), -0.03, -0.025, -0.02, -0.015, -0.01, -0.005, 0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03, float('inf')]
+        bin_labels = ['<-0.03', '-0.03~-0.025', '-0.025~-0.02', '-0.02~-0.015', '-0.015~-0.01', '-0.01~-0.005', '-0.005~0', '0~0.005', '0.005~0.01', '0.01~0.015', '0.015~0.02', '0.02~0.025', '0.025~0.03', '>0.03']
         
         # 统计各区间的天数
         return_counts = pd.cut(returns, bins=bins, labels=bin_labels).value_counts().sort_index()
@@ -436,9 +463,9 @@ if __name__ == "__main__":
     stock = stock_info("src/MinutesIdx.h5", "IC", window_size=7)
 
     # 滚动窗口参数优化
-    best_window, best_return, optimization_results = stock.optimize_window_size(
-        window_range=(3, 20),  # 搜索范围
-        t_exec=59              # 执行时间点
+    best_window, best_avg_sharpe, optimization_results = stock.optimize_window_size(
+        window_range=(3, 100),  # 搜索范围
+        t_exec=59              # 执行时间点（现在主要用于兼容性）
     )
 
     # 更新策略为最优参数
@@ -448,7 +475,7 @@ if __name__ == "__main__":
     stock.plot_window_optimization(optimization_results)
 
     # 绘制阈值演化图表
-    # stock.plot_threshold_evolution()
+    stock.plot_threshold_evolution()
 
     # 生成时间敏感度图表并获取最高夏普比率
     max_sharpe_ratio, max_sharpe_time, _, _ = stock.plot_time_sensitivity("adaptive_thres")

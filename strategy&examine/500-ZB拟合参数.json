@@ -1,0 +1,22 @@
+{
+  "n_samples": 500,
+  "parameters": {
+    "ma_period": 10,
+    "std_period": 10,
+    "k_value": 1.1691264899527813
+  },
+  "optimization_result": {
+    "best_params": [
+      10.0,
+      10.0,
+      1.1691264899527813
+    ],
+    "predicted_sharpe": 2.378133448717544,
+    "model_performance": {
+      "train_r2": 0.9654696886322227,
+      "test_r2": 0.8306052280301066
+    }
+  },
+  "timestamp": "2025-09-22 22:06:50.757799",
+  "version": "1.0"
+}
